@@ -1,4 +1,12 @@
+/** Hex board game
+* An implementation of the hex board game in Scala
+* See https://en.wikipedia.org/wiki/Hex_(board_game) for details on the game
+*
+* @author Daniel Fava
+* http://github.com/dfava/ScHex.git
+*/
 import sys.exit
+import scala.math._
 
 case class Board(size : Int) {
     var cells = Array.fill[Char](size, size)('.')
@@ -30,30 +38,62 @@ case class Board(size : Int) {
         iteration += 1
     }
 
-    def cellsToLines() = {
-        for { rowIdx <- -1 to cells.length } yield {
-            if (rowIdx == -1 || rowIdx == cells.length) "  " + (" " * (rowIdx-1)) + ("X " * cells.length)
+    def gameOver() = { // Detect whether a player has won, or whether the board is full
+        false // TODO: Implement
+    }
+
+    def cellsToLines() = { // Helper function to toString
+        // Transforms cells into an array of strings, each string being a board row
+        for { rowIdx <- -1 to size} yield {
+            if (rowIdx == -1 || rowIdx == size) "  " + (" " * (rowIdx-1)) + ("X " * size)
             else (" " * rowIdx) + "0 " + cells(rowIdx).mkString(" ") + " 0" }
+    }
+
+    def colNumbers = { // Return a vector representing the indices of every column
+        val digits = log10(size).toInt+1
+        for (digit <- digits-1 to 0 by -1) yield {
+            (for (i <- 0 to size-1) yield { ((i+1) / pow(10, digit).toInt) % 10 }).mkString(" ")
+        }
     }
 
     override def toString() = {
         val board = cellsToLines
         val decoratedBoard = for {
-                i <- 0 until board.length
+                i <- -1 until board.length
                 val spaces = size.toString.length - (i).toString.length + 1
             } yield {
-                if (i == 0 || i == cells.length+1) (" " * (spaces+1)) + board(i)
-                else (i).toString + (" " * spaces) + board(i)
+                if (i == 0 || i == size+1) (" " * (spaces + i.toString.length)) + board(i)
+                else if (i == -1) (" " * (spaces+4)) + colNumbers.mkString("\n" + (" " * (spaces+4)))
+                else i.toString + (" " * spaces) + board(i)
             }
         decoratedBoard.mkString("\n")
     }
 }
 
 object hex {
+    val default = Map('size -> "10")
+    val usage = s"""usage: hex [-h] [-s SIZE]
+
+Hex board game
+
+optional arguments:
+  -h, -help             show this help message and exit
+  -s SIZE               set the board size (default: $default('size))"""
     def main(args : Array[String]) {
-        val size = 10
-        val b = Board(size)
-        for (i <- 0 to 10) { // TODO: Loop until either one player won or the board is full
+        type OptionMap = Map[Symbol, String]
+        def parse(map : OptionMap, list : List[String]) : OptionMap = {
+            def isSwitch(s : String) = (s(0) == '-')
+            list match {
+                case Nil => map // Base case
+                case "-s" :: value :: tail if value.toInt > 0 => parse(map ++ Map('size -> value), tail)
+                case option :: tail if List("-h", "-help").contains(option) => println(usage); exit(0)
+                case option :: tail if List("-s").contains(option) => println("Invalid value passed to " + option); exit(1)
+                case option :: tail => println("ERR: Unknown option " + option); exit(1)
+            }
+        }
+        val options = try { parse(Map(), args.toList) } catch { case e : NumberFormatException => println("Invalid value passed to parameter"); exit(1) }
+        val b = Board((default ++ options)('size).toInt)
+        while (!b.gameOver) {
             println(b)
             print("Player " + (if (b.iteration % 2 == 0) '0' else 'X') + ": ")
             b.play()
